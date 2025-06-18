@@ -1,0 +1,414 @@
+/* src/index.css */
+
+/* Basic Resets and Global Styles */
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif; /* Using Inter font, ensure it's loaded in index.html */
+  -webkit-font-smoothing: antialiased; /* Smoother font rendering on macOS/iOS */
+  -moz-osx-font-smoothing: grayscale; /* Smoother font rendering on macOS */
+  background: linear-gradient(to bottom right, #6b46c1, #4c51bf); /* Deep purple to indigo gradient background */
+  color: #ffffff; /* Default text color for the application */
+  min-height: 100vh; /* Ensure body takes full viewport height */
+  display: flex;
+  justify-content: center; /* Center content horizontally */
+  align-items: flex-start; /* Align content to the top initially */
+  padding: 20px; /* Overall padding around the app container */
+  box-sizing: border-box; /* Include padding and border in element's total width and height */
+}
+
+/* Root element styling to ensure app spans full width */
+#root {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+/* App Container */
+.app-container {
+  display: flex;
+  flex-direction: column; /* Stack children vertically */
+  align-items: center; /* Center children horizontally */
+  width: 100%;
+  max-width: 1200px; /* Maximum width for the app container on larger screens */
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* Loading Screen */
+.loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh; /* Full viewport height */
+  background: linear-gradient(to bottom right, #6b46c1, #4c51bf); /* Same as body background */
+  color: #ffffff;
+  font-size: 1.25rem; /* Text size */
+}
+
+.loading-text {
+  animation: pulse 1.5s infinite ease-in-out; /* Pulsing animation for loading text */
+}
+
+/* Keyframe animation for pulsing effect */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* App Title */
+.app-title {
+  font-size: 2.5rem; /* Large font size for the main title */
+  font-weight: 700; /* Bold font weight */
+  margin-bottom: 24px; /* Space below the title */
+  text-align: center;
+  line-height: 1.25; /* Tight line height */
+}
+
+.title-part-1 {
+  display: block; /* Ensures each part takes its own line */
+  color: #fcd34d; /* Yellow color for "Daily Bread" */
+}
+
+.title-part-2 {
+  display: block;
+  margin-top: 8px; /* Space between title parts */
+  color: #ffffff;
+}
+
+/* Message Display */
+.message-display {
+  padding: 12px; /* Padding inside the message box */
+  border-radius: 8px; /* Rounded corners */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+  margin-bottom: 16px; /* Space below the message box */
+  text-align: center;
+  width: 100%;
+  max-width: 600px; /* Max width for message display */
+}
+
+.message-success {
+  background-color: #bbf7d0; /* Light green background for success messages */
+  color: #166534; /* Dark green text for success messages */
+}
+
+.message-error {
+  background-color: #fecaca; /* Light red background for error messages */
+  color: #7f1d1d; /* Dark red text for error messages */
+}
+
+/* User ID Display */
+.user-id-display {
+  font-size: 0.875rem; /* Small font size */
+  color: #e5e7eb; /* Light grey text */
+  margin-bottom: 16px; /* Space below */
+  text-align: center;
+}
+
+.user-id-value {
+  font-family: monospace; /* Monospaced font for ID for clarity */
+  background-color: #374151; /* Dark grey background for the ID value */
+  padding: 4px 8px; /* Padding around the ID */
+  border-radius: 6px; /* Rounded corners */
+  font-size: 0.75rem; /* Smaller font for ID value */
+}
+
+/* Share Verse Button */
+.share-verse-button {
+  background-color: #22c55e; /* Green button background */
+  color: #ffffff;
+  font-weight: 700;
+  padding: 12px 24px;
+  border-radius: 12px; /* Rounded corners */
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1); /* Larger shadow for prominence */
+  transition: transform 0.3s ease-in-out, background-color 0.3s ease-in-out; /* Smooth transitions for hover */
+  margin-bottom: 32px; /* Space below the button */
+  border: none; /* No default button border */
+  cursor: pointer;
+}
+
+.share-verse-button:hover {
+  background-color: #16a34a; /* Darker green on hover */
+  transform: scale(1.05); /* Slightly enlarge on hover */
+}
+
+.share-verse-button:focus {
+  outline: none; /* Remove default outline */
+  box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.75); /* Focus ring */
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed; /* Fixed position to cover entire viewport */
+  inset: 0; /* Cover all edges */
+  background-color: rgba(0, 0, 0, 0.75); /* Semi-transparent black background */
+  display: flex;
+  align-items: center; /* Center modal vertically */
+  justify-content: center; /* Center modal horizontally */
+  padding: 16px;
+  z-index: 50; /* Ensure modal is above other content */
+}
+
+.modal-content {
+  background-color: #ffffff;
+  color: #1f2937; /* Dark text for modal content */
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); /* Strong shadow */
+  max-width: 576px; /* Max width for modal content */
+  width: 100%;
+  position: relative; /* For absolute positioning of close button */
+}
+
+.modal-close-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  color: #6b7280; /* Grey color for close icon */
+  font-size: 2rem;
+  font-weight: 700;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.modal-close-button:hover {
+  color: #374151; /* Darker grey on hover */
+}
+
+.modal-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 24px;
+  text-align: center;
+  color: #4f46e5; /* Indigo color for modal title */
+}
+
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px; /* Space between form groups */
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.form-textarea,
+.form-input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db; /* Light grey border */
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); /* Subtle input shadow */
+  box-sizing: border-box; /* Ensures padding doesn't increase element width */
+}
+
+.form-textarea {
+  min-height: 100px;
+  resize: vertical; /* Allow vertical resizing of textarea */
+}
+
+.form-textarea:focus,
+.form-input:focus {
+  outline: none;
+  border-color: #6366f1; /* Indigo border on focus */
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5); /* Indigo focus ring */
+}
+
+.input-error {
+  border-color: #ef4444; /* Red border for invalid input */
+}
+
+.error-message {
+  color: #ef4444; /* Red text for error messages */
+  font-size: 0.875rem;
+  margin-top: 4px;
+}
+
+.submit-button {
+  width: 100%;
+  background-color: #4f46e5; /* Indigo button background */
+  color: #ffffff;
+  font-weight: 700;
+  padding: 12px 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease-in-out, background-color 0.3s ease-in-out;
+  border: none;
+  cursor: pointer;
+}
+
+.submit-button:hover {
+  background-color: #4338ca; /* Darker indigo on hover */
+  transform: scale(1.05);
+}
+
+.submit-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.75); /* Indigo focus ring */
+}
+
+.submit-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Verse Grid */
+.verse-grid {
+  display: grid;
+  gap: 24px; /* Space between grid items */
+  width: 100%;
+  max-width: 960px; /* Max width for the verse grid */
+  grid-template-columns: 1fr; /* Single column by default on small screens */
+}
+
+/* Responsive grid for tablets and desktops */
+@media (min-width: 768px) { /* Medium screens and up */
+  .verse-grid {
+    grid-template-columns: repeat(2, 1fr); /* Two columns */
+  }
+}
+
+@media (min-width: 1024px) { /* Large screens and up */
+  .verse-grid {
+    grid-template-columns: repeat(3, 1fr); /* Three columns */
+  }
+}
+
+.no-verses-message {
+  grid-column: 1 / -1; /* Spans across all columns in the grid */
+  text-align: center;
+  font-size: 1.125rem;
+  color: #d1d5db; /* Light grey text */
+}
+
+/* Verse Card */
+.verse-card {
+  background-color: #ffffff;
+  color: #1f2937; /* Dark text for card content */
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+.verse-card:hover {
+  transform: scale(1.05); /* Enlarge slightly on hover */
+  box-shadow: 0 20px 25px rgba(0, 0, 0, 0.1), 0 8px 10px rgba(0, 0, 0, 0.04); /* Enhanced shadow on hover */
+}
+
+.verse-text {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+  font-style: italic;
+  line-height: 1.625;
+}
+
+.verse-reference {
+  text-align: right;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #7c3aed; /* Purple color for verse reference */
+  border-top: 1px solid #e5e7eb; /* Thin light grey top border */
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.verse-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: #6b7280; /* Grey color for meta information */
+  margin-top: 16px;
+}
+
+.shared-info {
+  text-align: left;
+}
+
+.shared-user-id {
+  font-family: monospace;
+}
+
+.shared-timestamp {
+  color: #9ca3af; /* Lighter grey for timestamp */
+}
+
+/* Container for Like and Delete buttons */
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Space between buttons */
+}
+
+.like-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 9999px; /* Fully rounded */
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+  border: none;
+  cursor: pointer;
+}
+
+.like-button.liked {
+  background-color: #ef4444; /* Red when liked */
+  color: #ffffff;
+}
+
+.like-button:not(.liked) {
+  background-color: #e5e7eb; /* Light grey when not liked */
+  color: #374151;
+}
+
+.like-button.liked:hover {
+  background-color: #dc2626; /* Darker red on hover when liked */
+}
+
+.like-button:not(.liked):hover {
+  background-color: #d1d5db; /* Darker grey on hover when not liked */
+}
+
+.like-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.heart-icon {
+  font-size: 1.125rem;
+}
+
+/* Delete Button */
+.delete-button {
+  background-color: #fca5a5; /* Light red background */
+  color: #b91c1c; /* Darker red text/icon */
+  border: 1px solid #ef4444; /* Red border */
+  padding: 4px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.125rem; /* Larger icon size */
+  transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.delete-button:hover {
+  background-color: #ef4444; /* Solid red on hover */
+  color: #ffffff;
+  transform: scale(1.05);
+}

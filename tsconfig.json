@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    // ...
+    "target": "ESNext",
+    "module": "ESNext",
+    "jsx": "react-jsx", // or "react"
+    // ...
+    "moduleResolution": "bundler", // Or "node", "node16" depending on setup
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "paths": {
+        // If you have aliases, ensure they're correct here.
+        // For direct paths like './components/VerseCard', aliases are not involved.
+    }
+  },
+  "include": ["src"], // Ensure src is included
+  "references": [{ "path": "./tsconfig.node.json" }]
+}
