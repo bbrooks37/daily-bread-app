@@ -26,16 +26,19 @@ exports.handler = async (event, context) => {
   console.log(`[Netlify Function Debug] event.httpMethod: ${event.httpMethod}`);
   console.log(`[Netlify Function Debug] event.queryStringParameters: ${JSON.stringify(event.queryStringParameters)}`);
 
-  // FIX: More robust way to extract apiPath.
-  // event.path will be like '/.netlify/functions/proxy/bibles' or '/.netlify/functions/proxy/bibles/...'
-  // We want to remove '/.netlify/functions/proxy' to get the actual API endpoint path (e.g., '/bibles').
-  const apiPath = event.path.replace('/.netlify/functions/proxy', '');
+  // FIX: Directly remove the /api prefix from event.path, as per observed log.
+  // If event.path is /api/bibles, apiPath should become /bibles.
+  // Using replace with a regex to ensure it only matches at the start of the string.
+  let apiPath = event.path.replace(/^\/api/, '');
 
-  // Ensure apiPath is not empty and starts with a slash for correct concatenation
-  const formattedApiPath = apiPath.startsWith('/') ? apiPath : `/${apiPath}`;
+  // Ensure apiPath starts with a slash if it's empty or doesn't already start with one
+  // (e.g., if event.path was just '/api', apiPath would become '').
+  if (!apiPath.startsWith('/')) {
+      apiPath = `/${apiPath}`;
+  }
 
   const queryString = new URLSearchParams(event.queryStringParameters).toString();
-  const targetUrl = `${API_BASE_URL}${formattedApiPath}${queryString ? `?${queryString}` : ''}`;
+  const targetUrl = `${API_BASE_URL}${apiPath}${queryString ? `?${queryString}` : ''}`;
 
   console.log(`[Netlify Function] Proxying to: ${targetUrl}`); // Debugging: Log the final target URL
 
@@ -47,6 +50,7 @@ exports.handler = async (event, context) => {
         'Content-Type': event.headers['content-type'] || 'application/json',
       },
       // Ensure body is handled correctly for non-GET/HEAD requests
+      // Netlify Function event.body is already a string, so no need for JSON.stringify(JSON.parse(event.body))
       body: event.body && event.httpMethod !== 'GET' && event.httpMethod !== 'HEAD' ? event.body : undefined,
     });
 
