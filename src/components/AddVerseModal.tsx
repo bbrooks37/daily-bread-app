@@ -8,7 +8,7 @@ import '../index.css'; // Import global CSS for styling
 interface AddVerseModalProps {
   showModal: boolean; // Controls the visibility of the modal
   onClose: () => void; // Function to close the modal
-  // Existing props for verse text (now pre-filled by API)
+  // Existing props for verse text and reference (now mostly for display/final confirmation)
   verseText: string;
   setVerseText: (text: string) => void;
   // Validation errors
@@ -17,10 +17,7 @@ interface AddVerseModalProps {
   isSubmitting: boolean;
   onSubmit: (e: React.FormEvent) => void;
 
-  // Removed 'verseReference: string;' from here again.
-  // It is managed and constructed in App.tsx, not directly used or rendered in this modal.
-
-  // New props for API.Bible integration
+  // New props for API.Bible integration - ADDED THESE
   bibles: { id: string; name: string }[]; // List of available Bibles
   selectedBibleId: string; // Currently selected Bible ID
   onBibleChange: (id: string) => void; // Handler for Bible selection change
@@ -37,7 +34,7 @@ interface AddVerseModalProps {
   isLoadingBibles: boolean;
   isLoadingBooks: boolean;
   isLoadingChapters: boolean;
-  isLoadingVerseContent: boolean; // For fetching actual verse text
+  isLoadingVerseContent: boolean; // New: for fetching actual verse text
 }
 
 const AddVerseModal: React.FC<AddVerseModalProps> = ({
@@ -49,8 +46,7 @@ const AddVerseModal: React.FC<AddVerseModalProps> = ({
   verseReferenceError,
   isSubmitting,
   onSubmit,
-  // Removed 'verseReference' from destructuring here as well.
-  bibles,
+  bibles, // Destructure new props
   selectedBibleId,
   onBibleChange,
   books,

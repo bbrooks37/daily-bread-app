@@ -1,22 +1,17 @@
 // src/App.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // Added useCallback
 import { onAuthStateChanged, signInAnonymously, type User as FirebaseAuthUser } from 'firebase/auth';
 import { collection, addDoc, query, onSnapshot, serverTimestamp, type DocumentData, doc, updateDoc, arrayUnion, arrayRemove, deleteDoc } from 'firebase/firestore';
 
+// Import Firebase instances and config from your new firebase.ts file
 import { auth, db, firebaseConfig } from './firebase';
+
+// Import the new components
 import MessageDisplay from './components/MessageDisplay';
 import AddVerseModal from './components/AddVerseModal';
 import VerseCard from './components/VerseCard';
-import './index.css';
 
-// API.Bible configuration - Dynamic PROXY_BASE_URL for production vs development
-// In development (local), it points to your local Node.js proxy server.
-// In production (on Netlify), it points to the Netlify Function endpoint.
-const PROXY_BASE_URL = process.env.NODE_ENV === 'production'
-  ? '/api' // This will be handled by the Netlify redirect rule in netlify.toml
-  : 'http://localhost:3001/api'; // Local Node.js proxy for development
-
-// Interface for Verse data structure
+// Interface for Verse (can be in a shared types.ts file for larger projects)
 interface Verse {
   id: string;
   text: string;
@@ -54,34 +49,43 @@ interface VerseContentResponse {
   };
 }
 
+// API.Bible configuration - Dynamic PROXY_BASE_URL for production vs development
+const PROXY_BASE_URL = process.env.NODE_ENV === 'production'
+  ? '/api' // This will be handled by the Netlify redirect rule in netlify.toml
+  : 'http://localhost:3001/api'; // Local Node.js proxy for development
+
 
 const App: React.FC = () => {
+  // State variables for authentication and data
   const [userId, setUserId] = useState<string | null>(null);
   const [verses, setVerses] = useState<Verse[]>([]);
   const [message, setMessage] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // State variables for the AddVerseModal form (now simplified for API.Bible integration)
   const [showAddVerseModal, setShowAddVerseModal] = useState<boolean>(false);
-  const [verseText, setVerseText] = useState<string>('');
-  const [selectedBibleId, setSelectedBibleId] = useState<string>('');
-  const [selectedBookId, setSelectedBookId] = useState<string>('');
-  const [selectedChapterId, setSelectedChapterId] = useState<string>('');
-  const [verseReferenceForFirestore, setVerseReferenceForFirestore] = useState<string>('');
-
+  const [verseText, setVerseText] = useState<string>(''); // This will be pre-filled from API.Bible
+  const [verseReferenceForFirestore, setVerseReferenceForFirestore] = useState<string>(''); // This is the formatted ref to save
   const [verseTextError, setVerseTextError] = useState<string>('');
   const [verseReferenceError, setVerseReferenceError] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
+  // New state variables for API.Bible integration
   const [bibles, setBibles] = useState<Bible[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [selectedBibleId, setSelectedBibleId] = useState<string>('');
+  const [selectedBookId, setSelectedBookId] = useState<string>('');
+  const [selectedChapterId, setSelectedChapterId] = useState<string>('');
+
+  // Loading states for API.Bible calls
   const [isLoadingBibles, setIsLoadingBibles] = useState<boolean>(false);
   const [isLoadingBooks, setIsLoadingBooks] = useState<boolean>(false);
   const [isLoadingChapters, setIsLoadingChapters] = useState<boolean>(false);
   const [isLoadingVerseContent, setIsLoadingVerseContent] = useState<boolean>(false);
 
 
-  // Firebase Authentication
+  // Effect for Firebase Authentication
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user: FirebaseAuthUser | null) => {
       if (user) {
@@ -98,17 +102,20 @@ const App: React.FC = () => {
       }
       setIsLoading(false);
     });
+
     return () => unsubscribeAuth();
   }, []);
 
-  // Fetch verses from Firestore
+  // Effect for fetching verses from Firestore (depends on db and userId)
   useEffect(() => {
     if (!db || !userId) {
       return;
     }
+
     const projectId = firebaseConfig.projectId;
     const versesCollectionRef = collection(db, `artifacts/${projectId}/public/data/dailyVerses`);
     const q = query(versesCollectionRef /*, orderBy('timestamp', 'desc')*/);
+
     const unsubscribeFirestore = onSnapshot(q, (snapshot) => {
       const fetchedVerses: Verse[] = [];
       snapshot.forEach((doc) => {
@@ -126,8 +133,9 @@ const App: React.FC = () => {
       setVerses(fetchedVerses);
     }, (error) => {
       console.error("Error fetching verses:", error);
-      setMessage(`❌ Error loading verses: ${error.message}`);
+      setMessage(`Error loading verses: ${error.message}`);
     });
+
     return () => unsubscribeFirestore();
   }, [db, userId]);
 
@@ -136,18 +144,20 @@ const App: React.FC = () => {
   // API.Bible Fetching Logic (NOW VIA PROXY)
   // =========================================================
 
-  // Fetch Bibles via proxy
+  // Fetch Bibles via proxy when component mounts
   useEffect(() => {
     const fetchBibles = async () => {
       setIsLoadingBibles(true);
       try {
-        const response = await fetch(`${PROXY_BASE_URL}/bibles`); // Call your proxy
+        const response = await fetch(`${PROXY_BASE_URL}/bibles`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
+        // Filter for English Bibles
         const englishBibles = data.data.filter((b: any) => b.language.id === 'eng');
         setBibles(englishBibles);
+        // Automatically select the first English Bible if available
         if (englishBibles.length > 0) {
           setSelectedBibleId(englishBibles[0].id);
         }
@@ -159,27 +169,29 @@ const App: React.FC = () => {
       }
     };
     fetchBibles();
-  }, []);
+  }, []); // Empty dependency array means this runs once on mount
 
-  // Fetch Books when Bible changes via proxy
+  // Fetch Books when selected Bible changes
   useEffect(() => {
     if (!selectedBibleId) {
       setBooks([]);
       setSelectedBookId('');
       setChapters([]);
       setSelectedChapterId('');
-      setVerseText('');
+      setVerseText(''); // Clear verse text when Bible changes
+      setVerseReferenceForFirestore(''); // Clear reference
       return;
     }
     const fetchBooks = async () => {
       setIsLoadingBooks(true);
-      setBooks([]);
-      setSelectedBookId('');
-      setChapters([]);
-      setSelectedChapterId('');
-      setVerseText('');
+      setBooks([]); // Clear previous books
+      setSelectedBookId(''); // Reset selected book
+      setChapters([]); // Clear chapters
+      setSelectedChapterId(''); // Reset chapter
+      setVerseText(''); // Clear verse text
+      setVerseReferenceForFirestore(''); // Clear reference
       try {
-        const response = await fetch(`${PROXY_BASE_URL}/bibles/${selectedBibleId}/books`); // Call your proxy
+        const response = await fetch(`${PROXY_BASE_URL}/bibles/${selectedBibleId}/books`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -193,28 +205,31 @@ const App: React.FC = () => {
       }
     };
     fetchBooks();
-  }, [selectedBibleId]);
+  }, [selectedBibleId]); // Re-run when selectedBibleId changes
 
-  // Fetch Chapters when Book changes via proxy
+  // Fetch Chapters when selected Book changes
   useEffect(() => {
     if (!selectedBookId) {
       setChapters([]);
       setSelectedChapterId('');
-      setVerseText('');
+      setVerseText(''); // Clear verse text
+      setVerseReferenceForFirestore(''); // Clear reference
       return;
     }
     const fetchChapters = async () => {
       setIsLoadingChapters(true);
-      setChapters([]);
-      setSelectedChapterId('');
-      setVerseText('');
+      setChapters([]); // Clear previous chapters
+      setSelectedChapterId(''); // Reset selected chapter
+      setVerseText(''); // Clear verse text
+      setVerseReferenceForFirestore(''); // Clear reference
       try {
-        const response = await fetch(`${PROXY_BASE_URL}/bibles/${selectedBibleId}/books/${selectedBookId}/chapters`); // Call your proxy
+        const response = await fetch(`${PROXY_BASE_URL}/bibles/${selectedBibleId}/books/${selectedBookId}/chapters`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
         setChapters(data.data);
+        // If there's only one chapter, pre-select it
         if (data.data.length === 1) {
           setSelectedChapterId(data.data[0].id);
         }
@@ -226,9 +241,9 @@ const App: React.FC = () => {
       }
     };
     fetchChapters();
-  }, [selectedBibleId, selectedBookId]);
+  }, [selectedBibleId, selectedBookId]); // Re-run when selectedBookId changes
 
-  // Fetch Verse Content when Chapter changes via proxy
+  // Fetch Verse Content when Chapter changes (using useCallback for memoization)
   const fetchVerseContent = useCallback(async () => {
     if (!selectedChapterId || !selectedBibleId || !selectedBookId) {
       setVerseText('');
@@ -236,27 +251,29 @@ const App: React.FC = () => {
       return;
     }
     setIsLoadingVerseContent(true);
-    setVerseText('');
-    setVerseReferenceError('');
+    setVerseText(''); // Clear verse text before fetching new content
+    setVerseReferenceError(''); // Clear errors
     setVerseTextError('');
-    setMessage('');
+    setMessage(''); // Clear general message
     try {
+      // Parameters for API.Bible content fetch (ensure verse numbers are included)
       const params = new URLSearchParams({
-        'content-type': 'text',
+        'content-type': 'text', // Request plain text content
         'include-notes': 'false',
         'include-titles': 'false',
-        'include-chapter-numbers': 'false',
-        'include-verse-numbers': 'true',
+        'include-chapter-numbers': 'false', // We want verse numbers inside the content
+        'include-verse-numbers': 'true',     // THIS IS KEY: includes verse numbers like [1]
       }).toString();
 
-      const response = await fetch(`${PROXY_BASE_URL}/bibles/${selectedBibleId}/chapters/${selectedChapterId}?${params}`); // Call your proxy
+      const response = await fetch(`${PROXY_BASE_URL}/bibles/${selectedBibleId}/chapters/${selectedChapterId}?${params}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const result: VerseContentResponse = await response.json();
+      const result: VerseContentResponse = await response.json(); // Type assertion
       const content = result.data.content;
-      setVerseText(content);
+      setVerseText(content); // Set the raw chapter content
 
+      // Construct formatted verse reference for Firestore
       const currentBook = books.find(book => book.id === selectedBookId);
       const currentChapter = chapters.find(chapter => chapter.id === selectedChapterId);
 
@@ -273,15 +290,15 @@ const App: React.FC = () => {
     } finally {
       setIsLoadingVerseContent(false);
     }
-  }, [selectedBibleId, selectedBookId, selectedChapterId, books, chapters]);
+  }, [selectedBibleId, selectedBookId, selectedChapterId, books, chapters]); // Dependencies for useCallback
 
   useEffect(() => {
-    fetchVerseContent();
+    fetchVerseContent(); // Trigger fetch when selectedChapterId or the callback itself changes
   }, [selectedChapterId, fetchVerseContent]);
 
 
   // =========================================================
-  // Existing Handlers (Unchanged)
+  // Existing Handlers (Adapted for API.Bible integration)
   // =========================================================
 
   const handleAddVerseSubmit = async (e: React.FormEvent) => {
@@ -297,16 +314,19 @@ const App: React.FC = () => {
     }
 
     let isValid = true;
+    // New validation for API.Bible dropdowns
     if (!selectedBibleId || !selectedBookId || !selectedChapterId) {
       setVerseReferenceError('Please select a Bible, Book, and Chapter.');
       isValid = false;
     }
+    // Existing validation for verse text length
     if (verseText.trim().length < 10) {
       setVerseTextError('Verse text must be at least 10 characters long.');
       isValid = false;
     }
-    if (verseText.trim().length > 1000) {
-      setVerseTextError('Verse text cannot exceed 1000 characters.');
+    // Updated max character limit for verseText
+    if (verseText.trim().length > 2000) { // Increased from 500 to 2000 characters
+      setVerseTextError('Verse text cannot exceed 2000 characters.');
       isValid = false;
     }
 
@@ -320,15 +340,15 @@ const App: React.FC = () => {
       const projectId = firebaseConfig.projectId;
       await addDoc(collection(db, `artifacts/${projectId}/public/data/dailyVerses`), {
         text: verseText.trim(),
-        verseReference: verseReferenceForFirestore,
+        verseReference: verseReferenceForFirestore, // Use the dynamically created reference
         userId: userId,
         timestamp: serverTimestamp(),
         likedBy: [],
       });
       setMessage("✨ Verse added successfully! Thank you for sharing God's word. 🙏");
       setVerseText('');
-      setVerseReferenceForFirestore('');
-      setSelectedBookId('');
+      setVerseReferenceForFirestore(''); // Clear formatted reference as well
+      setSelectedBookId(''); // Reset dropdowns after successful submission
       setSelectedChapterId('');
       setShowAddVerseModal(false);
     } catch (error: any) {
@@ -344,15 +364,22 @@ const App: React.FC = () => {
       setMessage("Please sign in to like verses.");
       return;
     }
+
     const projectId = firebaseConfig.projectId;
     const verseRef = doc(db, `artifacts/${projectId}/public/data/dailyVerses`, verseId);
+
     const hasLiked = currentLikedBy.includes(userId);
+
     try {
       if (hasLiked) {
-        await updateDoc(verseRef, { likedBy: arrayRemove(userId) });
+        await updateDoc(verseRef, {
+          likedBy: arrayRemove(userId)
+        });
         setMessage("💖 Verse unliked.");
       } else {
-        await updateDoc(verseRef, { likedBy: arrayUnion(userId) });
+        await updateDoc(verseRef, {
+          likedBy: arrayUnion(userId)
+        });
         setMessage("❤️ Verse liked!");
       }
     } catch (error: any) {
@@ -366,13 +393,16 @@ const App: React.FC = () => {
       setMessage("Please sign in to delete verses.");
       return;
     }
+
     if (userId !== verseUserId) {
       setMessage("🚫 You can only delete your own verses.");
       return;
     }
+
     if (!window.confirm("Are you sure you want to delete this verse? This action cannot be undone.")) {
       return;
     }
+
     try {
       const projectId = firebaseConfig.projectId;
       const verseRef = doc(db, `artifacts/${projectId}/public/data/dailyVerses`, verseId);
@@ -397,25 +427,25 @@ const App: React.FC = () => {
     <div className="app-container">
       <h1 className="app-title">
         <span className="title-part-1">Daily Bread</span>
-        <span className="block mt-2">Spread Love Through God's Word</span>
+        <span className="title-part-2">Spread Love Through God's Word</span>
       </h1>
 
       <MessageDisplay message={message} />
 
       {userId && (
         <div className="user-id-display">
-          Your User ID: <span className="user-id-value">{userId}</span>
+          Your User ID: <span className="font-mono bg-gray-700 px-2 py-1 rounded-md text-xs">{userId}</span>
         </div>
       )}
 
       <button
         onClick={() => {
           setShowAddVerseModal(true);
-          setVerseText('');
+          setVerseText(''); // Clear state when opening modal
           setVerseReferenceForFirestore('');
-          setSelectedBookId('');
+          setSelectedBookId(''); // Reset dropdowns
           setSelectedChapterId('');
-          setVerseTextError('');
+          setVerseTextError(''); // Clear errors
           setVerseReferenceError('');
           setMessage('');
         }}
@@ -428,26 +458,31 @@ const App: React.FC = () => {
         showModal={showAddVerseModal}
         onClose={() => {
           setShowAddVerseModal(false);
-          setVerseText('');
+          setVerseText(''); // Clear state when closing modal
           setVerseReferenceForFirestore('');
-          setSelectedBookId('');
+          setSelectedBookId(''); // Reset dropdowns
           setSelectedChapterId('');
-          setVerseTextError('');
+          setVerseTextError(''); // Clear errors
           setVerseReferenceError('');
           setMessage('');
         }}
         verseText={verseText}
         setVerseText={setVerseText}
+        // These props are no longer directly managed by AddVerseModal as simple inputs
+        // verseReference={verseReference} // REMOVED as it's now internal to App.tsx logic
+        // setVerseReference={setVerseReference} // REMOVED
         verseTextError={verseTextError}
-        verseReferenceError={verseReferenceError}
-        // CORRECTED: Pass the state variable 'selectedBookId' (string) for the prop
-        // and the setter 'setSelectedBookId' (function) for the change handler.
+        verseReferenceError={verseReferenceError} // This will now apply to the dropdowns
+        isSubmitting={isSubmitting}
+        onSubmit={handleAddVerseSubmit}
+
+        // New props for API.Bible integration
         bibles={bibles}
         selectedBibleId={selectedBibleId}
         onBibleChange={setSelectedBibleId}
         books={books}
-        selectedBookId={selectedBookId} // Corrected: Pass the string value
-        onBookChange={setSelectedBookId} // This remains the setter function
+        selectedBookId={selectedBookId}
+        onBookChange={setSelectedBookId}
         chapters={chapters}
         selectedChapterId={selectedChapterId}
         onChapterChange={setSelectedChapterId}
@@ -455,8 +490,6 @@ const App: React.FC = () => {
         isLoadingBooks={isLoadingBooks}
         isLoadingChapters={isLoadingChapters}
         isLoadingVerseContent={isLoadingVerseContent}
-        isSubmitting={isSubmitting}
-        onSubmit={handleAddVerseSubmit}
       />
 
       <div className="verse-grid">
