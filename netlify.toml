@@ -16,6 +16,12 @@
   # node_version = "20" # REMOVED: This line caused a parsing error.
                       # Netlify will use a default Node.js version if not specified.
 
+  # NEW: Configure specific functions (like proxy.cjs)
+  [functions.proxy] # This refers to your 'proxy.cjs' function
+    external_node_modules = [
+      "node-fetch" # Tell esbuild to NOT bundle node-fetch with this function
+    ]
+
 # Redirects for API calls to proxy them through the Netlify Function
 # This rule will redirect any request from your frontend starting with /api/
 # to your proxy Netlify Function.
