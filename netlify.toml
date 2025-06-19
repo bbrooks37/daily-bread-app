@@ -1,0 +1,24 @@
+# netlify.toml
+# This file configures Netlify for deploying your Vite React app
+# and setting up a serverless function proxy for API.Bible calls.
+
+[build]
+  # Command to build your frontend application
+  command = "npm run build"
+  # Directory that contains the deploy-ready HTML files and assets
+  publish = "dist" # Vite typically outputs to 'dist'
+
+[functions]
+  # Directory where your Netlify Functions are located
+  directory = "netlify/functions"
+  # Node.js version for functions (optional, but good practice)
+  node_bundler = "esbuild" # Modern bundler for functions
+  node_version = "20" # Use a stable Node.js version, e.g., 18 or 20
+
+# Redirects for API calls to proxy them through the Netlify Function
+# This rule will redirect any request from your frontend starting with /api/
+# to your proxy Netlify Function.
+[[redirects]]
+  from = "/api/*" # Frontend requests to /api/bibles will match here
+  to = "/.netlify/functions/proxy/:splat" # Redirects to your Netlify Function
+  status = 200 # Use 200 status to make it a transparent proxy

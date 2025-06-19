@@ -9,8 +9,12 @@ import AddVerseModal from './components/AddVerseModal';
 import VerseCard from './components/VerseCard';
 import './index.css';
 
-// API.Bible configuration - NOW POINTING TO YOUR PROXY SERVER
-const PROXY_BASE_URL = 'http://localhost:3001/api'; // Your proxy server URL
+// API.Bible configuration - Dynamic PROXY_BASE_URL for production vs development
+// In development (local), it points to your local Node.js proxy server.
+// In production (on Netlify), it points to the Netlify Function endpoint.
+const PROXY_BASE_URL = process.env.NODE_ENV === 'production'
+  ? '/api' // This will be handled by the Netlify redirect rule in netlify.toml
+  : 'http://localhost:3001/api'; // Local Node.js proxy for development
 
 // Interface for Verse data structure
 interface Verse {
@@ -62,7 +66,7 @@ const App: React.FC = () => {
   const [selectedBibleId, setSelectedBibleId] = useState<string>('');
   const [selectedBookId, setSelectedBookId] = useState<string>('');
   const [selectedChapterId, setSelectedChapterId] = useState<string>('');
-  const [verseReferenceForFirestore, setVerseReferenceForFirestore] = useState<string>(''); // This holds the formatted reference to save
+  const [verseReferenceForFirestore, setVerseReferenceForFirestore] = useState<string>('');
 
   const [verseTextError, setVerseTextError] = useState<string>('');
   const [verseReferenceError, setVerseReferenceError] = useState<string>('');
@@ -436,13 +440,14 @@ const App: React.FC = () => {
         setVerseText={setVerseText}
         verseTextError={verseTextError}
         verseReferenceError={verseReferenceError}
-        // Removed the problematic 'verseReference' prop from here, as AddVerseModal no longer expects it.
+        // CORRECTED: Pass the state variable 'selectedBookId' (string) for the prop
+        // and the setter 'setSelectedBookId' (function) for the change handler.
         bibles={bibles}
         selectedBibleId={selectedBibleId}
         onBibleChange={setSelectedBibleId}
         books={books}
-        selectedBookId={selectedBookId}
-        onBookChange={setSelectedBookId}
+        selectedBookId={selectedBookId} // Corrected: Pass the string value
+        onBookChange={setSelectedBookId} // This remains the setter function
         chapters={chapters}
         selectedChapterId={selectedChapterId}
         onChapterChange={setSelectedChapterId}
