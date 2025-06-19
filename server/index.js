@@ -6,70 +6,59 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-// node-fetch is used for making HTTP requests in Node.js,
-// similar to the browser's native fetch API.
 const fetch = require('node-fetch');
 
 const app = express();
 const PORT = process.env.PORT || 3001; // Server will run on port 3001
 
-// Enable CORS for all origins. In production, you might want to restrict this
-// to only your frontend's domain (e.g., cors({ origin: 'http://localhost:5173' }))
 app.use(cors());
-app.use(express.json()); // Enable JSON body parsing for POST requests if needed (not directly used here but good practice)
+app.use(express.json());
 
-// Retrieve API key from environment variables (from .env file)
 const API_BIBLE_KEY = process.env.API_BIBLE_KEY;
 const API_BASE_URL = 'https://api.scripture.api.bible/v1';
+
+// Debugging: Log the API key when the server starts
+console.log(`[SERVER_START] Loaded API_BIBLE_KEY: ${API_BIBLE_KEY ? '****** (key loaded)' : '!!! KEY NOT LOADED !!!'}`);
 
 // Middleware to check for API key
 app.use((req, res, next) => {
   if (!API_BIBLE_KEY) {
-    console.error("API_BIBLE_KEY is not set in environment variables.");
+    console.error("[PROXY_ERROR] API_BIBLE_KEY is not set in environment variables.");
     return res.status(500).json({ error: "Server configuration error: API Key missing." });
   }
   next();
 });
 
 // Generic proxy endpoint for API.Bible
-// It will forward all requests to API.Bible, adding the API key securely.
-// FIX: Using app.use('/api', ...) to handle all requests starting with /api
-// This is a more robust way to capture arbitrary paths for proxying.
 app.use('/api', async (req, res) => {
-  // req.originalUrl contains the full URL path before routing (e.g., /api/bibles)
-  // We need to remove the /api prefix to get the path for the external API
-  const apiPath = req.originalUrl.substring('/api'.length); // Extracts '/bibles' or '/bibles/xyz/books' etc.
-
-  // Reconstruct the full URL to the external API.Bible service
-  // Note: req.query already contains parsed query parameters from the original request
+  const apiPath = req.originalUrl.substring('/api'.length);
   const targetUrl = `${API_BASE_URL}${apiPath}?${new URLSearchParams(req.query).toString()}`;
-  console.log(`Proxying request to: ${targetUrl}`);
+  console.log(`[PROXY_REQUEST] Proxying to: ${targetUrl}`); // Debugging: Log the target URL
 
   try {
     const response = await fetch(targetUrl, {
-      method: req.method, // Forward the original HTTP method (GET, POST, etc.)
+      method: req.method,
       headers: {
-        'api-key': API_BIBLE_KEY, // Inject API key securely on the server
+        'api-key': API_BIBLE_KEY,
         'Content-Type': req.headers['content-type'] || 'application/json',
-        // Copy other relevant headers from the incoming request if needed
       },
-      // If handling POST/PUT/PATCH, you would forward the request body here
-      // For now, we only expect GET, but adding for completeness:
       body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined,
     });
 
-    // Check if the API.Bible response was successful
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Error from API.Bible (${response.status}): ${errorText}`);
-      // Forward API.Bible's error status and message directly to the frontend
+      console.error(`[API_BIBLE_ERROR] Error from API.Bible (${response.status} ${response.statusText}): ${errorText}`); // Debugging: More detailed error
+      // Check for specific API.Bible error messages if possible
+      if (response.status === 401 || response.status === 403) {
+        return res.status(401).json({ error: "Unauthorized: API Key might be invalid or missing permissions." });
+      }
       return res.status(response.status).send(errorText);
     }
 
     const data = await response.json();
-    res.json(data); // Send API.Bible's successful response back to the frontend
+    res.json(data);
   } catch (error) {
-    console.error('Proxy request failed:', error);
+    console.error('[PROXY_CATCH_ERROR] Proxy request failed:', error); // Debugging: Catch all errors
     res.status(500).json({ error: 'Failed to proxy request to API.Bible' });
   }
 });

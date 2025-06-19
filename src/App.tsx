@@ -62,7 +62,7 @@ const App: React.FC = () => {
   const [selectedBibleId, setSelectedBibleId] = useState<string>('');
   const [selectedBookId, setSelectedBookId] = useState<string>('');
   const [selectedChapterId, setSelectedChapterId] = useState<string>('');
-  const [verseReferenceForFirestore, setVerseReferenceForFirestore] = useState<string>('');
+  const [verseReferenceForFirestore, setVerseReferenceForFirestore] = useState<string>(''); // This holds the formatted reference to save
 
   const [verseTextError, setVerseTextError] = useState<string>('');
   const [verseReferenceError, setVerseReferenceError] = useState<string>('');
@@ -237,7 +237,6 @@ const App: React.FC = () => {
     setVerseTextError('');
     setMessage('');
     try {
-      // Note: We need to URL-encode the parameters when passing to proxy
       const params = new URLSearchParams({
         'content-type': 'text',
         'include-notes': 'false',
@@ -250,7 +249,7 @@ const App: React.FC = () => {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const result: VerseContentResponse = await response.json(); // Explicitly type the result
+      const result: VerseContentResponse = await response.json();
       const content = result.data.content;
       setVerseText(content);
 
@@ -435,9 +434,9 @@ const App: React.FC = () => {
         }}
         verseText={verseText}
         setVerseText={setVerseText}
-        verseTextError={verseTextError} // Pass verseTextError here
-        verseReferenceError={verseReferenceError} // Pass verseReferenceError here
-        verseReference={verseReferenceForFirestore}
+        verseTextError={verseTextError}
+        verseReferenceError={verseReferenceError}
+        // Removed the problematic 'verseReference' prop from here, as AddVerseModal no longer expects it.
         bibles={bibles}
         selectedBibleId={selectedBibleId}
         onBibleChange={setSelectedBibleId}
