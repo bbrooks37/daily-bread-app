@@ -1,21 +1,18 @@
 // src/App.tsx
-// This is the main application component, orchestrating data flow, state, and child components.
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { onAuthStateChanged, signInAnonymously, type User as FirebaseAuthUser } from 'firebase/auth';
 import { collection, addDoc, query, onSnapshot, serverTimestamp, type DocumentData, doc, updateDoc, arrayUnion, arrayRemove, deleteDoc } from 'firebase/firestore';
 
-// Import Firebase instances and config from the centralized firebase.ts file
 import { auth, db, firebaseConfig } from './firebase';
-
-// Import the modularized React components
 import MessageDisplay from './components/MessageDisplay';
 import AddVerseModal from './components/AddVerseModal';
 import VerseCard from './components/VerseCard';
-
-// Import global CSS for overall application styling
 import './index.css';
 
-// Interface for Verse data structure (could be in a shared 'types.ts' file)
+// API.Bible configuration - NOW POINTING TO YOUR PROXY SERVER
+const PROXY_BASE_URL = 'http://localhost:3001/api'; // Your proxy server URL
+
+// Interface for Verse data structure
 interface Verse {
   id: string;
   text: string;
@@ -25,69 +22,89 @@ interface Verse {
   likedBy: string[];
 }
 
+// Interfaces for API.Bible data (simplified for this context, but maintain accurate structure)
+interface Bible {
+  id: string;
+  name: string;
+  nameLocal?: string; // Optional as not always needed
+  abbreviation?: string;
+}
+
+interface Book {
+  id: string;
+  name: string;
+  nameLong?: string;
+  abbreviation?: string;
+}
+
+interface Chapter {
+  id: string;
+  number: string;
+  reference?: string;
+}
+
+interface VerseContentResponse {
+  data: {
+    content: string;
+    reference: string;
+  };
+}
+
+
 const App: React.FC = () => {
-  // State variables for Firebase authentication status and user data
   const [userId, setUserId] = useState<string | null>(null);
-  // State for storing the list of fetched verses
   const [verses, setVerses] = useState<Verse[]>([]);
-  // State for displaying general messages to the user (e.g., success, error)
   const [message, setMessage] = useState<string>('');
-  // State to manage the overall loading status of the application
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // State variables for the "Add Verse" modal and its form inputs
   const [showAddVerseModal, setShowAddVerseModal] = useState<boolean>(false);
   const [verseText, setVerseText] = useState<string>('');
-  const [verseReference, setVerseReference] = useState<string>('');
-  // State for validation errors related to verse text and reference
+  const [selectedBibleId, setSelectedBibleId] = useState<string>('');
+  const [selectedBookId, setSelectedBookId] = useState<string>('');
+  const [selectedChapterId, setSelectedChapterId] = useState<string>('');
+  const [verseReferenceForFirestore, setVerseReferenceForFirestore] = useState<string>('');
+
   const [verseTextError, setVerseTextError] = useState<string>('');
   const [verseReferenceError, setVerseReferenceError] = useState<string>('');
-  // State to indicate if a verse submission is in progress
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Effect hook for Firebase Authentication initialization and state observation.
-  // This runs once when the component mounts.
+  const [bibles, setBibles] = useState<Bible[]>([]);
+  const [books, setBooks] = useState<Book[]>([]);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [isLoadingBibles, setIsLoadingBibles] = useState<boolean>(false);
+  const [isLoadingBooks, setIsLoadingBooks] = useState<boolean>(false);
+  const [isLoadingChapters, setIsLoadingChapters] = useState<boolean>(false);
+  const [isLoadingVerseContent, setIsLoadingVerseContent] = useState<boolean>(false);
+
+
+  // Firebase Authentication
   useEffect(() => {
-    // Subscribe to authentication state changes using the 'auth' instance from firebase.ts
     const unsubscribeAuth = onAuthStateChanged(auth, async (user: FirebaseAuthUser | null) => {
       if (user) {
-        // If a user is signed in, set their UID and a welcome message
         setUserId(user.uid);
         setMessage(`Welcome, User ID: ${user.uid.substring(0, 8)}...`);
       } else {
-        // If no user is signed in, attempt anonymous authentication
         console.log("No user signed in. Attempting anonymous sign-in.");
         try {
-          await signInAnonymously(auth); // Use the imported 'auth' instance
+          await signInAnonymously(auth);
         } catch (authError: any) {
-          // Log and display authentication errors
           console.error("Firebase authentication error:", authError);
           setMessage(`Authentication failed: ${authError.message}`);
         }
       }
-      // Set loading to false once authentication attempt is complete
       setIsLoading(false);
     });
-
-    // Cleanup function: unsubscribe from auth state changes when component unmounts
     return () => unsubscribeAuth();
-  }, []); // Empty dependency array ensures this effect runs only once
+  }, []);
 
-  // Effect hook for fetching verses from Firestore in real-time.
-  // This runs whenever 'db' (Firestore instance) or 'userId' changes.
+  // Fetch verses from Firestore
   useEffect(() => {
-    // Only proceed if Firestore and user ID are available
     if (!db || !userId) {
       return;
     }
-
-    // Construct the Firestore collection reference using the project ID
     const projectId = firebaseConfig.projectId;
     const versesCollectionRef = collection(db, `artifacts/${projectId}/public/data/dailyVerses`);
-    // Create a query for the collection (orderBy commented out to avoid index requirements in Canvas)
     const q = query(versesCollectionRef /*, orderBy('timestamp', 'desc')*/);
-
-    // Subscribe to real-time updates from Firestore
     const unsubscribeFirestore = onSnapshot(q, (snapshot) => {
       const fetchedVerses: Verse[] = [];
       snapshot.forEach((doc) => {
@@ -97,114 +114,242 @@ const App: React.FC = () => {
           text: data.text,
           verseReference: data.verseReference,
           userId: data.userId,
-          timestamp: data.timestamp ? data.timestamp.toDate() : new Date(), // Convert Firestore Timestamp to Date object
-          likedBy: data.likedBy || [], // Ensure likedBy array exists, default to empty
+          timestamp: data.timestamp ? data.timestamp.toDate() : new Date(),
+          likedBy: data.likedBy || [],
         });
       });
-      // Client-side sorting: newest verses first
       fetchedVerses.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-      setVerses(fetchedVerses); // Update state with fetched verses
+      setVerses(fetchedVerses);
     }, (error) => {
-      // Log and display errors during data fetching
       console.error("Error fetching verses:", error);
       setMessage(`❌ Error loading verses: ${error.message}`);
     });
-
-    // Cleanup function: unsubscribe from Firestore updates when component unmounts or dependencies change
     return () => unsubscribeFirestore();
-  }, [db, userId]); // Dependencies: Firestore instance and user ID
+  }, [db, userId]);
 
-  // Handler for submitting a new verse via the modal form
+
+  // =========================================================
+  // API.Bible Fetching Logic (NOW VIA PROXY)
+  // =========================================================
+
+  // Fetch Bibles via proxy
+  useEffect(() => {
+    const fetchBibles = async () => {
+      setIsLoadingBibles(true);
+      try {
+        const response = await fetch(`${PROXY_BASE_URL}/bibles`); // Call your proxy
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        const englishBibles = data.data.filter((b: any) => b.language.id === 'eng');
+        setBibles(englishBibles);
+        if (englishBibles.length > 0) {
+          setSelectedBibleId(englishBibles[0].id);
+        }
+      } catch (error: any) {
+        console.error("Error fetching bibles:", error);
+        setMessage(`❌ Failed to load Bibles: ${error.message}`);
+      } finally {
+        setIsLoadingBibles(false);
+      }
+    };
+    fetchBibles();
+  }, []);
+
+  // Fetch Books when Bible changes via proxy
+  useEffect(() => {
+    if (!selectedBibleId) {
+      setBooks([]);
+      setSelectedBookId('');
+      setChapters([]);
+      setSelectedChapterId('');
+      setVerseText('');
+      return;
+    }
+    const fetchBooks = async () => {
+      setIsLoadingBooks(true);
+      setBooks([]);
+      setSelectedBookId('');
+      setChapters([]);
+      setSelectedChapterId('');
+      setVerseText('');
+      try {
+        const response = await fetch(`${PROXY_BASE_URL}/bibles/${selectedBibleId}/books`); // Call your proxy
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setBooks(data.data);
+      } catch (error: any) {
+        console.error("Error fetching books:", error);
+        setMessage(`❌ Failed to load books for selected Bible: ${error.message}`);
+      } finally {
+        setIsLoadingBooks(false);
+      }
+    };
+    fetchBooks();
+  }, [selectedBibleId]);
+
+  // Fetch Chapters when Book changes via proxy
+  useEffect(() => {
+    if (!selectedBookId) {
+      setChapters([]);
+      setSelectedChapterId('');
+      setVerseText('');
+      return;
+    }
+    const fetchChapters = async () => {
+      setIsLoadingChapters(true);
+      setChapters([]);
+      setSelectedChapterId('');
+      setVerseText('');
+      try {
+        const response = await fetch(`${PROXY_BASE_URL}/bibles/${selectedBibleId}/books/${selectedBookId}/chapters`); // Call your proxy
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setChapters(data.data);
+        if (data.data.length === 1) {
+          setSelectedChapterId(data.data[0].id);
+        }
+      } catch (error: any) {
+        console.error("Error fetching chapters:", error);
+        setMessage(`❌ Failed to load chapters for selected Book: ${error.message}`);
+      } finally {
+        setIsLoadingChapters(false);
+      }
+    };
+    fetchChapters();
+  }, [selectedBibleId, selectedBookId]);
+
+  // Fetch Verse Content when Chapter changes via proxy
+  const fetchVerseContent = useCallback(async () => {
+    if (!selectedChapterId || !selectedBibleId || !selectedBookId) {
+      setVerseText('');
+      setVerseReferenceForFirestore('');
+      return;
+    }
+    setIsLoadingVerseContent(true);
+    setVerseText('');
+    setVerseReferenceError('');
+    setVerseTextError('');
+    setMessage('');
+    try {
+      // Note: We need to URL-encode the parameters when passing to proxy
+      const params = new URLSearchParams({
+        'content-type': 'text',
+        'include-notes': 'false',
+        'include-titles': 'false',
+        'include-chapter-numbers': 'false',
+        'include-verse-numbers': 'true',
+      }).toString();
+
+      const response = await fetch(`${PROXY_BASE_URL}/bibles/${selectedBibleId}/chapters/${selectedChapterId}?${params}`); // Call your proxy
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const result: VerseContentResponse = await response.json(); // Explicitly type the result
+      const content = result.data.content;
+      setVerseText(content);
+
+      const currentBook = books.find(book => book.id === selectedBookId);
+      const currentChapter = chapters.find(chapter => chapter.id === selectedChapterId);
+
+      if (currentBook && currentChapter) {
+        setVerseReferenceForFirestore(`${currentBook.name} ${currentChapter.number}`);
+      } else {
+        setVerseReferenceForFirestore(result.data.reference || `API Reference: ${selectedChapterId}`);
+      }
+    } catch (error: any) {
+      console.error("Error fetching verse content:", error);
+      setMessage(`❌ Failed to load verse content: ${error.message}`);
+      setVerseText('Failed to load verse. Please try again or select a different verse.');
+      setVerseReferenceForFirestore('');
+    } finally {
+      setIsLoadingVerseContent(false);
+    }
+  }, [selectedBibleId, selectedBookId, selectedChapterId, books, chapters]);
+
+  useEffect(() => {
+    fetchVerseContent();
+  }, [selectedChapterId, fetchVerseContent]);
+
+
+  // =========================================================
+  // Existing Handlers (Unchanged)
+  // =========================================================
+
   const handleAddVerseSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); // Prevent default form submission behavior
+    e.preventDefault();
 
-    // Clear previous error messages
     setVerseTextError('');
     setVerseReferenceError('');
     setMessage('');
 
-    // Ensure Firebase is initialized and user is authenticated
     if (!db || !userId) {
       setMessage("Please wait for authentication to complete before adding a verse.");
       return;
     }
 
-    // Client-side form validation
     let isValid = true;
+    if (!selectedBibleId || !selectedBookId || !selectedChapterId) {
+      setVerseReferenceError('Please select a Bible, Book, and Chapter.');
+      isValid = false;
+    }
     if (verseText.trim().length < 10) {
       setVerseTextError('Verse text must be at least 10 characters long.');
       isValid = false;
     }
-    if (verseText.trim().length > 500) {
-      setVerseTextError('Verse text cannot exceed 500 characters.');
-      isValid = false;
-    }
-    if (!verseReference.trim()) {
-      setVerseReferenceError('Verse reference cannot be empty.');
-      isValid = false;
-    } else if (!/^[A-Za-z\s]+\s\d+:\d+(-\d+)?(\s\(.+\))?$/.test(verseReference.trim())) {
-      // Regex for basic "Book Chapter:Verse" or "Book Chapter:Verse-Verse (Version)" format
-      setVerseReferenceError('Please use a valid format (e.g., John 3:16 or Romans 8:28-29 (NIV)).');
+    if (verseText.trim().length > 1000) {
+      setVerseTextError('Verse text cannot exceed 1000 characters.');
       isValid = false;
     }
 
-    // If validation fails, display a general error message and stop
     if (!isValid) {
       setMessage('Please correct the errors in the form.');
       return;
     }
 
-    setIsSubmitting(true); // Set submitting state to true
+    setIsSubmitting(true);
     try {
       const projectId = firebaseConfig.projectId;
-      // Add a new document to the 'dailyVerses' collection
       await addDoc(collection(db, `artifacts/${projectId}/public/data/dailyVerses`), {
-        text: verseText.trim(), // Trim whitespace from text
-        verseReference: verseReference.trim(), // Trim whitespace from reference
+        text: verseText.trim(),
+        verseReference: verseReferenceForFirestore,
         userId: userId,
-        timestamp: serverTimestamp(), // Use Firestore's server timestamp for consistency
-        likedBy: [], // Initialize likedBy array as empty
+        timestamp: serverTimestamp(),
+        likedBy: [],
       });
-      // Display success message and reset form fields
       setMessage("✨ Verse added successfully! Thank you for sharing God's word. 🙏");
       setVerseText('');
-      setVerseReference('');
-      setShowAddVerseModal(false); // Close the modal
+      setVerseReferenceForFirestore('');
+      setSelectedBookId('');
+      setSelectedChapterId('');
+      setShowAddVerseModal(false);
     } catch (error: any) {
-      // Log and display error if adding verse fails
       console.error("Error adding document: ", error);
       setMessage(`❌ Error adding verse: ${error.message}. Please try again.`);
     } finally {
-      setIsSubmitting(false); // Always reset submitting state
+      setIsSubmitting(false);
     }
   };
 
-  // Handler for liking/unliking a verse
   const handleLikeVerse = async (verseId: string, currentLikedBy: string[]) => {
     if (!db || !userId) {
       setMessage("Please sign in to like verses.");
       return;
     }
-
     const projectId = firebaseConfig.projectId;
-    // Get a reference to the specific verse document
     const verseRef = doc(db, `artifacts/${projectId}/public/data/dailyVerses`, verseId);
-
-    // Check if the current user has already liked this verse
     const hasLiked = currentLikedBy.includes(userId);
-
     try {
       if (hasLiked) {
-        // If liked, remove user's ID from likedBy array (unlike)
-        await updateDoc(verseRef, {
-          likedBy: arrayRemove(userId)
-        });
+        await updateDoc(verseRef, { likedBy: arrayRemove(userId) });
         setMessage("💖 Verse unliked.");
       } else {
-        // If not liked, add user's ID to likedBy array (like)
-        await updateDoc(verseRef, {
-          likedBy: arrayUnion(userId)
-        });
+        await updateDoc(verseRef, { likedBy: arrayUnion(userId) });
         setMessage("❤️ Verse liked!");
       }
     } catch (error: any) {
@@ -213,31 +358,21 @@ const App: React.FC = () => {
     }
   };
 
-  // Handler for deleting a verse
   const handleDeleteVerse = async (verseId: string, verseUserId: string) => {
     if (!db || !userId) {
       setMessage("Please sign in to delete verses.");
       return;
     }
-
-    // Client-side check: Ensure the current user is the author of the verse.
-    // Firebase security rules will also enforce this.
     if (userId !== verseUserId) {
       setMessage("🚫 You can only delete your own verses.");
       return;
     }
-
-    // Provide a confirmation prompt to the user.
-    // In a production app, a custom modal would be used instead of window.confirm.
     if (!window.confirm("Are you sure you want to delete this verse? This action cannot be undone.")) {
       return;
     }
-
     try {
       const projectId = firebaseConfig.projectId;
-      // Get a reference to the specific verse document
       const verseRef = doc(db, `artifacts/${projectId}/public/data/dailyVerses`, verseId);
-      // Delete the document from Firestore
       await deleteDoc(verseRef);
       setMessage("🗑️ Verse deleted successfully!");
     } catch (error: any) {
@@ -246,7 +381,7 @@ const App: React.FC = () => {
     }
   };
 
-  // Display a loading screen while the application initializes
+
   if (isLoading) {
     return (
       <div className="loading-screen">
@@ -257,65 +392,80 @@ const App: React.FC = () => {
 
   return (
     <div className="app-container">
-      {/* Main application title */}
       <h1 className="app-title">
         <span className="title-part-1">Daily Bread</span>
-        <span className="title-part-2">Spread Love Through God's Word</span>
+        <span className="block mt-2">Spread Love Through God's Word</span>
       </h1>
 
-      {/* Message display area */}
       <MessageDisplay message={message} />
 
-      {/* Display user ID if available */}
       {userId && (
         <div className="user-id-display">
           Your User ID: <span className="user-id-value">{userId}</span>
         </div>
       )}
 
-      {/* Button to open the "Add Verse" modal */}
       <button
-        onClick={() => setShowAddVerseModal(true)}
+        onClick={() => {
+          setShowAddVerseModal(true);
+          setVerseText('');
+          setVerseReferenceForFirestore('');
+          setSelectedBookId('');
+          setSelectedChapterId('');
+          setVerseTextError('');
+          setVerseReferenceError('');
+          setMessage('');
+        }}
         className="share-verse-button"
       >
         Share Your Daily Verse!
       </button>
 
-      {/* The AddVerseModal component */}
       <AddVerseModal
         showModal={showAddVerseModal}
         onClose={() => {
           setShowAddVerseModal(false);
-          setVerseTextError(''); // Clear errors when closing modal
+          setVerseText('');
+          setVerseReferenceForFirestore('');
+          setSelectedBookId('');
+          setSelectedChapterId('');
+          setVerseTextError('');
           setVerseReferenceError('');
-          setMessage(''); // Clear general message
-          setVerseText(''); // Clear form fields
-          setVerseReference('');
+          setMessage('');
         }}
         verseText={verseText}
         setVerseText={setVerseText}
-        verseReference={verseReference}
-        setVerseReference={setVerseReference}
-        verseTextError={verseTextError}
-        verseReferenceError={verseReferenceError}
+        verseTextError={verseTextError} // Pass verseTextError here
+        verseReferenceError={verseReferenceError} // Pass verseReferenceError here
+        verseReference={verseReferenceForFirestore}
+        bibles={bibles}
+        selectedBibleId={selectedBibleId}
+        onBibleChange={setSelectedBibleId}
+        books={books}
+        selectedBookId={selectedBookId}
+        onBookChange={setSelectedBookId}
+        chapters={chapters}
+        selectedChapterId={selectedChapterId}
+        onChapterChange={setSelectedChapterId}
+        isLoadingBibles={isLoadingBibles}
+        isLoadingBooks={isLoadingBooks}
+        isLoadingChapters={isLoadingChapters}
+        isLoadingVerseContent={isLoadingVerseContent}
         isSubmitting={isSubmitting}
         onSubmit={handleAddVerseSubmit}
       />
 
-      {/* Grid to display all verses */}
       <div className="verse-grid">
         {verses.length === 0 ? (
-          // Message if no verses are available
           <p className="no-verses-message">No verses yet. Be the first to share!</p>
         ) : (
-          // Map through the verses array and render a VerseCard for each
           verses.map((verse) => (
             <VerseCard
               key={verse.id}
               verse={verse}
               userId={userId}
               onLike={handleLikeVerse}
-              onDelete={handleDeleteVerse} // Pass the delete handler to VerseCard
+              onDelete={handleDeleteVerse}
             />
           ))
         )}

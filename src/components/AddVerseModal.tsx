@@ -1,5 +1,6 @@
 // src/components/AddVerseModal.tsx
-// This component provides the modal overlay and form for users to add new verses.
+// This component provides the modal overlay and form for users to add new verses,
+// now integrating API.Bible dropdowns for verse selection.
 import React from 'react';
 import '../index.css'; // Import global CSS for styling
 
@@ -7,14 +8,36 @@ import '../index.css'; // Import global CSS for styling
 interface AddVerseModalProps {
   showModal: boolean; // Controls the visibility of the modal
   onClose: () => void; // Function to close the modal
-  verseText: string; // Current value of the verse text input
-  setVerseText: (text: string) => void; // Setter for verse text state
-  verseReference: string; // Current value of the verse reference input
-  setVerseReference: (ref: string) => void; // Setter for verse reference state
-  verseTextError: string; // Error message for verse text input
-  verseReferenceError: string; // Error message for verse reference input
-  isSubmitting: boolean; // Indicates if the form is currently being submitted
-  onSubmit: (e: React.FormEvent) => void; // Function to handle form submission
+  // Existing props for verse text and reference (now mostly for display/final confirmation)
+  verseText: string;
+  setVerseText: (text: string) => void;
+  // Validation errors
+  verseTextError: string;
+  verseReferenceError: string; // Still used for internal validation, but populated by API
+  isSubmitting: boolean;
+  onSubmit: (e: React.FormEvent) => void;
+
+  // New prop for verseReference (which holds the formatted reference for Firestore) - ADDED THIS
+  verseReference: string;
+
+  // New props for API.Bible integration
+  bibles: { id: string; name: string }[]; // List of available Bibles
+  selectedBibleId: string; // Currently selected Bible ID
+  onBibleChange: (id: string) => void; // Handler for Bible selection change
+
+  books: { id: string; name: string }[]; // List of books for the selected Bible
+  selectedBookId: string; // Currently selected Book ID
+  onBookChange: (id: string) => void; // Handler for Book selection change
+
+  chapters: { id: string; number: string }[]; // List of chapters for the selected Book
+  selectedChapterId: string; // Currently selected Chapter ID
+  onChapterChange: (id: string) => void; // Handler for Chapter selection change
+
+  // Loading states for API calls
+  isLoadingBibles: boolean;
+  isLoadingBooks: boolean;
+  isLoadingChapters: boolean;
+  isLoadingVerseContent: boolean; // New: for fetching actual verse text
 }
 
 const AddVerseModal: React.FC<AddVerseModalProps> = ({
@@ -22,72 +45,121 @@ const AddVerseModal: React.FC<AddVerseModalProps> = ({
   onClose,
   verseText,
   setVerseText,
-  verseReference,
-  setVerseReference,
   verseTextError,
   verseReferenceError,
   isSubmitting,
   onSubmit,
+  verseReference, // Destructure the newly added prop
+  bibles,
+  selectedBibleId,
+  onBibleChange,
+  books,
+  selectedBookId,
+  onBookChange,
+  chapters,
+  selectedChapterId,
+  onChapterChange,
+  isLoadingBibles,
+  isLoadingBooks,
+  isLoadingChapters,
+  isLoadingVerseContent,
 }) => {
-  // If the modal should not be shown, render nothing
   if (!showModal) return null;
 
   return (
-    // Modal overlay to dim the background and center the modal content
     <div className="modal-overlay">
       <div className="modal-content">
-        {/* Close button for the modal */}
         <button
           onClick={onClose}
           className="modal-close-button"
-          aria-label="Close modal" // Accessibility improvement
+          aria-label="Close modal"
         >
           &times;
         </button>
         <h2 className="modal-title">Add Your Daily Verse</h2>
         <form onSubmit={onSubmit} className="modal-form">
+          {/* Bible Selection */}
           <div className="form-group">
-            <label htmlFor="verseText" className="form-label">Verse Text</label>
+            <label htmlFor="bibleSelect" className="form-label">Select Bible Version:</label>
+            <select
+              id="bibleSelect"
+              className="form-input"
+              value={selectedBibleId}
+              onChange={(e) => onBibleChange(e.target.value)}
+              disabled={isLoadingBibles || bibles.length === 0}
+            >
+              {isLoadingBibles && <option value="">Loading Bibles...</option>}
+              {!isLoadingBibles && bibles.length === 0 && <option value="">No Bibles found</option>}
+              {bibles.map((bible) => (
+                <option key={bible.id} value={bible.id}>
+                  {bible.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Book Selection */}
+          <div className="form-group">
+            <label htmlFor="bookSelect" className="form-label">Select Book:</label>
+            <select
+              id="bookSelect"
+              className="form-input"
+              value={selectedBookId}
+              onChange={(e) => onBookChange(e.target.value)}
+              disabled={!selectedBibleId || isLoadingBooks || books.length === 0}
+            >
+              <option value="">{isLoadingBooks ? 'Loading Books...' : 'Select a Book'}</option>
+              {books.map((book) => (
+                <option key={book.id} value={book.id}>
+                  {book.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Chapter Selection */}
+          <div className="form-group">
+            <label htmlFor="chapterSelect" className="form-label">Select Chapter:</label>
+            <select
+              id="chapterSelect"
+              className="form-input"
+              value={selectedChapterId}
+              onChange={(e) => onChapterChange(e.target.value)}
+              disabled={!selectedBookId || isLoadingChapters || chapters.length === 0}
+            >
+              <option value="">{isLoadingChapters ? 'Loading Chapters...' : 'Select a Chapter'}</option>
+              {chapters.map((chapter) => (
+                <option key={chapter.id} value={chapter.id}>
+                  {chapter.number}
+                </option>
+              ))}
+            </select>
+            {verseReferenceError && <p className="error-message">{verseReferenceError}</p>}
+          </div>
+
+          {/* Verse Text Area (pre-filled by API) */}
+          <div className="form-group">
+            <label htmlFor="verseText" className="form-label">Verse Text:</label>
             <textarea
               id="verseText"
-              value={verseText}
+              value={isLoadingVerseContent ? 'Loading verse content...' : verseText}
               onChange={(e) => {
                 setVerseText(e.target.value);
               }}
-              placeholder="e.g., 'For God so loved the world, that he gave his only Son...'"
-              // Apply 'input-error' class if there's a validation error
+              placeholder="Verse content will appear here once selected..."
               className={`form-textarea ${verseTextError ? 'input-error' : ''}`}
               required
-              aria-invalid={!!verseTextError} // Accessibility improvement
-              aria-describedby={verseTextError ? 'verse-text-error' : undefined} // Accessibility improvement
+              readOnly={isLoadingVerseContent} // Prevent manual editing while loading
+              aria-invalid={!!verseTextError}
+              aria-describedby={verseTextError ? 'verse-text-error' : undefined}
             ></textarea>
-            {/* Display verse text error message */}
             {verseTextError && <p id="verse-text-error" className="error-message">{verseTextError}</p>}
           </div>
-          <div className="form-group">
-            <label htmlFor="verseReference" className="form-label">Verse Reference</label>
-            <input
-              type="text"
-              id="verseReference"
-              value={verseReference}
-              onChange={(e) => {
-                setVerseReference(e.target.value);
-              }}
-              placeholder="e.g., John 3:16 (KJV)"
-              // Apply 'input-error' class if there's a validation error
-              className={`form-input ${verseReferenceError ? 'input-error' : ''}`}
-              required
-              aria-invalid={!!verseReferenceError} // Accessibility improvement
-              aria-describedby={verseReferenceError ? 'verse-reference-error' : undefined} // Accessibility improvement
-            />
-            {/* Display verse reference error message */}
-            {verseReferenceError && <p id="verse-reference-error" className="error-message">{verseReferenceError}</p>}
-          </div>
-          {/* Submit button, disabled when submitting */}
+
           <button
             type="submit"
             className="submit-button"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLoadingVerseContent || !selectedChapterId || !verseText.trim()}
           >
             {isSubmitting ? 'Submitting Verse...' : 'Submit Verse'}
           </button>
