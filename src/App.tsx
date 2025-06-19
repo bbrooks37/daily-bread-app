@@ -11,6 +11,8 @@ import MessageDisplay from './components/MessageDisplay';
 import AddVerseModal from './components/AddVerseModal';
 import VerseCard from './components/VerseCard';
 
+import './index.css'; // Import global CSS for App.tsx itself
+
 // Interface for Verse (can be in a shared types.ts file for larger projects)
 interface Verse {
   id: string;
@@ -434,7 +436,7 @@ const App: React.FC = () => {
 
       {userId && (
         <div className="user-id-display">
-          Your User ID: <span className="font-mono bg-gray-700 px-2 py-1 rounded-md text-xs">{userId}</span>
+          Your User ID: <span className="user-id-value">{userId}</span>
         </div>
       )}
 
@@ -468,15 +470,8 @@ const App: React.FC = () => {
         }}
         verseText={verseText}
         setVerseText={setVerseText}
-        // These props are no longer directly managed by AddVerseModal as simple inputs
-        // verseReference={verseReference} // REMOVED as it's now internal to App.tsx logic
-        // setVerseReference={setVerseReference} // REMOVED
-        verseTextError={verseTextError}
-        verseReferenceError={verseReferenceError} // This will now apply to the dropdowns
-        isSubmitting={isSubmitting}
-        onSubmit={handleAddVerseSubmit}
-
-        // New props for API.Bible integration
+        verseReferenceError={verseReferenceError} // <--- Corrected this line
+        // verseReference={verseReferenceForFirestore} // <--- This line removed
         bibles={bibles}
         selectedBibleId={selectedBibleId}
         onBibleChange={setSelectedBibleId}
@@ -490,6 +485,8 @@ const App: React.FC = () => {
         isLoadingBooks={isLoadingBooks}
         isLoadingChapters={isLoadingChapters}
         isLoadingVerseContent={isLoadingVerseContent}
+        isSubmitting={isSubmitting}
+        onSubmit={handleAddVerseSubmit}
       />
 
       <div className="verse-grid">
