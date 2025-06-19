@@ -13,7 +13,8 @@
   directory = "netlify/functions"
   # Node.js version for functions (optional, but good practice)
   node_bundler = "esbuild" # Modern bundler for functions
-  node_version = "20" # Use a stable Node.js version, e.g., 18 or 20
+  # node_version = "20" # REMOVED: This line caused a parsing error.
+                      # Netlify will use a default Node.js version if not specified.
 
 # Redirects for API calls to proxy them through the Netlify Function
 # This rule will redirect any request from your frontend starting with /api/
